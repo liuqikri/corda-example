@@ -1,0 +1,184 @@
+buildscript {
+    ext {
+        kotlin_version = '1.2.50'
+        spring_version = '5.1.1.RELEASE'
+        spring_boot_version = '2.2.2.RELEASE'
+        spring_boot_gradle_plugin_version = '2.2.2.RELEASE'
+        spring_session_version = '1.3.3.RELEASE'
+        corda_release_version = '4.9'
+        corda_core_release_version = '4.9'
+        corda_platform_version = '4'
+        corda_version = '4.6'
+        corda_gradle_plugins_version = '5.0.12'
+        log4j_version = '2.11.2'
+        lmax_version = '3.4.2'
+        guava_version = '21.0'
+        junit_version = '5.5.2'
+        kluent_version = '1.38'
+        postgres_version = '42.2.5'
+        lombok_version = '1.18.24'
+        jetty_version = '9.4.18.v20190429'
+        quasar_version = '0.7.10'
+        slf4j_version = '1.7.25'
+        maven_url = "http://172.22.80.23:8083"
+        maven_username = "deployment"
+        maven_password = "deployment"
+
+        v1_contract = ":contracts:v1-ehkd-poc-contract"
+        v2_contract = ":contracts:v2-ehkd-poc-contract"
+        v3_contract = ":contracts:v3-ehkd-poc-contract"
+
+        v1_workflow = ":workflows:v1-ehkd-poc-workflow"
+        v2_workflow = ":workflows:v2-ehkd-poc-workflow"
+        v3_workflow = ":workflows:v3-ehkd-poc-workflow"
+    }
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+        maven { url 'https://software.r3.com/artifactory/corda-releases' }
+        maven { url 'https://software.r3.com/artifactory/corda-dependencies' }
+    }
+    dependencies {
+        classpath "net.corda.plugins:cordapp:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:cordformation:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:quasar-utils:$corda_gradle_plugins_version"
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:$spring_boot_gradle_plugin_version"
+        classpath "co.paralleluniverse:quasar-core:$quasar_version"
+    }
+}
+
+allprojects { //Properties that you need to compile your project (The application)
+    apply from: "${rootProject.projectDir}/repositories.gradle"
+    apply plugin: 'java'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'maven-publish'
+    apply plugin: 'maven'
+
+    group 'com.ehkd'
+    version '1.1-SNAPSHOT'
+
+    compileJava {
+        options.compilerArgs << '-parameters'
+    }
+
+    repositories {
+        mavenLocal()
+        jcenter()
+        mavenCentral()
+        maven { url 'https://software.r3.com/artifactory/corda' }
+        maven { url 'https://jitpack.io' }
+    }
+
+    jar {
+        // This makes the JAR's SHA-256 hash repeatable.
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
+    //打包源码
+    task sourceJar(type: Jar) {
+        from sourceSets.main.allJava
+    }
+
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'net.corda.plugins.cordapp'
+apply plugin: 'net.corda.plugins.cordformation'
+apply plugin: 'net.corda.plugins.quasar-utils'
+apply plugin: 'org.springframework.boot'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+    implementation "org.projectlombok:lombok:$lombok_version"
+
+    // Corda dependencies.
+    compile "net.corda:corda-core:$corda_core_release_version"
+    compile "net.corda:corda-node-api:$corda_release_version"
+    compile "net.corda:corda:$corda_release_version"
+    compile "net.corda:corda-rpc:$corda_release_version"
+    compile "net.corda:corda-jackson:$corda_release_version"
+
+    compile("org.springframework.boot:spring-boot-starter-websocket:$spring_boot_version") {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
+    }
+
+    compile("org.springframework.boot:spring-boot-starter-security:$spring_boot_version") {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
+    }
+
+    compileOnly "org.projectlombok:lombok:$lombok_version"
+    annotationProcessor "org.projectlombok:lombok:$lombok_version"
+
+    implementation("org.postgresql:postgresql:42.5.0")
+    testCompileOnly "org.projectlombok:lombok:$lombok_version"
+    testAnnotationProcessor "org.projectlombok:lombok:$lombok_version"
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version")
+    testCompile "junit:junit:4.13.1"
+
+    cordaDriver "org.postgresql:postgresql:42.2.5"
+
+    cordapp project(v1_contract)
+    cordapp project(v2_contract)
+    cordapp project(v3_contract)
+
+    cordapp project(v1_workflow)
+    cordapp project(v2_workflow)
+    cordapp project(v3_workflow)
+}
+
+repositories {
+    mavenLocal()
+    jcenter()
+    mavenCentral()
+    maven { url 'https://software.r3.com/artifactory/corda' }
+    maven { url 'https://jitpack.io' }
+}
+
+task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
+
+    nodeDefaults {
+        projectCordapp {
+            deploy = false
+        }
+        cordapp project(v1_contract)
+        cordapp project(v1_workflow)
+        //runSchemaMigration = true
+    }
+    node {
+        name "O=Notary,L=London,C=GB"
+        notary = [validating : false]
+        p2pAddress "corda-notary-service:10002"
+        rpcSettings {
+            address("0.0.0.0:10003")
+            adminAddress("0.0.0.0:10043")
+        }
+        extraConfig = [
+                'dataSourceProperties.dataSource.url' : 'jdbc:postgresql://corda-postgres:5432/notary',
+                'dataSourceProperties.dataSourceClassName' : 'org.postgresql.ds.PGSimpleDataSource',
+                'dataSourceProperties.dataSource.user' : 'postgres',
+                'dataSourceProperties.dataSource.password' : 'postgres'
+        ]
+    }
+    node {
+        name "O=PartyA,L=London,C=GB"
+        p2pAddress "corda-bank-service:10005"
+        rpcSettings {
+            address("0.0.0.0:10006")
+            adminAddress("0.0.0.0:10046")
+        }
+        rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
+        extraConfig = [
+                'dataSourceProperties.dataSource.url' : 'jdbc:postgresql://corda-postgres:5432/bank',
+                'dataSourceProperties.dataSourceClassName' : 'org.postgresql.ds.PGSimpleDataSource',
+                'dataSourceProperties.dataSource.user' : 'postgres',
+                'dataSourceProperties.dataSource.password' : 'postgres'
+        ]
+    }
+}

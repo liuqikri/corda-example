@@ -1,0 +1,91 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd">
+    <changeSet author="R3.Corda" id="create_ehkd_member_state">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="member_states"/>
+            </not>
+        </preConditions>
+        <createTable tableName="member_states">
+            <column name="transaction_id" type="NVARCHAR(64)"/>
+            <column name="output_index" type="INT"/>
+            <column name="user_id" type="NVARCHAR(64)"/>
+            <column name="type" type="NVARCHAR(64)"/>
+            <column name="industry" type="NVARCHAR(64)"/>
+            <column name="linear_id" type="NVARCHAR(64)"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="R3.Corda" id="create_ehkd_token_state">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="token_states"/>
+            </not>
+        </preConditions>
+        <createTable tableName="token_states">
+            <column name="transaction_id" type="NVARCHAR(64)"/>
+            <column name="output_index" type="INT"/>
+            <column name="id" type="NVARCHAR(64)"/>
+            <column name="batch_id" type="NVARCHAR(64)"/>
+            <column name="name" type="NVARCHAR(64)"/>
+            <column name="amount" type="BIGINT"/>
+            <column name="owner" type="NVARCHAR(64)"/>
+            <column name="token_type" type="NVARCHAR(64)"/>
+            <column name="merchant_list" type="NVARCHAR(64)"/>
+            <column name="is_voucher" type="INT"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="R3.Corda" id="create_ehkd_receiver_group_state">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="receiver_group_states"/>
+            </not>
+        </preConditions>
+        <createTable tableName="receiver_group_states">
+            <column name="transaction_id" type="NVARCHAR(64)"/>
+            <column name="output_index" type="INT"/>
+            <column name="group_id" type="NVARCHAR(64)"/>
+            <column name="linear_id" type="NVARCHAR(64)"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="R3.Corda" id="create_ehkd_merchant_list_state">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="merchant_list_states"/>
+            </not>
+        </preConditions>
+        <createTable tableName="merchant_list_states">
+            <column name="transaction_id" type="NVARCHAR(64)"/>
+            <column name="output_index" type="INT"/>
+            <column name="merchant_list_id" type="NVARCHAR(64)"/>
+            <column name="merchant_list" type="NVARCHAR(1000)"/>
+            <column name="linear_id" type="NVARCHAR(64)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet author="R3.Corda" id="create_ehkd_token_states_index">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="token_states"/>
+            <not>
+                <indexExists indexName="token_states_idx_1" />
+            </not>
+            <not>
+                <indexExists indexName="token_states_idx_2" />
+            </not>
+        </preConditions>
+        <createIndex tableName="token_states" indexName="token_states_idx_1">
+            <column name="is_voucher"></column>
+            <column name="token_type"></column>
+            <column name="amount"></column>
+        </createIndex>
+        <createIndex tableName="token_states" indexName="token_states_idx_2">
+            <column name="is_voucher"></column>
+            <column name="token_type"></column>
+            <column name="batch_id"></column>
+            <column name="owner"></column>
+            <column name="amount"></column>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

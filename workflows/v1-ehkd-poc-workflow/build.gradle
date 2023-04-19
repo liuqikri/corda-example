@@ -1,0 +1,99 @@
+jar.baseName = "ehkd-poc-corda-workflow"
+jar.archiveBaseName = "ehkd-poc-corda-workflow"
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'net.corda.plugins.cordapp'
+apply plugin: 'net.corda.plugins.cordformation'
+apply plugin: 'net.corda.plugins.quasar-utils'
+apply plugin: "java"
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    cordaCompile "net.corda:corda-core:$corda_core_release_version"
+    cordaCompile "net.corda:corda-jackson:$corda_release_version"
+    cordaCompile "net.corda:corda-node-api:$corda_release_version"
+
+    testCompile "net.corda:corda-node-driver:$corda_release_version"
+    cordaRuntime "net.corda:corda:$corda_release_version"
+    cordaRuntime "net.corda:corda-core:$corda_core_release_version"
+    cordaRuntime "net.corda:corda-rpc:$corda_release_version"
+    cordaRuntime "net.corda:corda-jackson:$corda_release_version"
+    cordaRuntime "net.corda:corda-node-api:$corda_release_version"
+
+    cordaCompile "org.apache.logging.log4j:log4j-slf4j-impl:${log4j_version}"
+    cordaCompile "org.apache.logging.log4j:log4j-web:${log4j_version}"
+    cordaCompile "org.slf4j:jul-to-slf4j:$slf4j_version"
+
+    cordaDriver "org.postgresql:postgresql:42.2.5"
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+
+    testCompileOnly 'org.projectlombok:lombok:1.18.24'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.24'
+
+    testCompile "org.junit.jupiter:junit-jupiter-api:$junit_version"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit_version"
+    testCompile "org.junit.jupiter:junit-jupiter-params:$junit_version"
+
+    cordapp project(v1_contract)
+}
+
+jar {
+    enabled=true
+}
+
+test {
+    useJUnitPlatform()
+}
+
+cordapp {
+    targetPlatformVersion corda_platform_version.toInteger()
+    minimumPlatformVersion corda_platform_version.toInteger()
+    contract {
+        name "Ehkd CorDapp Workflow"
+        vendor "Corda Open Source"
+        licence "Apache License, Version 2.0"
+        versionId 1
+    }
+}
+
+//上传maven私服
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId project.group
+            artifactId project.name
+            version project.version
+            //如果是war包填写components.web，如果是jar包填写components.java
+            from components.java
+            //配置上传源码
+            artifact sourceJar {
+                classifier "sources"
+            }
+        }
+    }
+    repositories {
+        maven {
+            //指定要上传的maven私服仓库
+            if (project.version.endsWith('-SNAPSHOT')) {
+                url = "$maven_url/repository/maven-snapshots/"
+            } else {
+                url = "$maven_url/repository/maven-releases/"
+            }
+            credentials {
+                username "$maven_username"
+                password "$maven_password"
+            }
+        }
+    }
+}
+
+
+
+
+
