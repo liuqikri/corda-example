@@ -23,14 +23,6 @@ buildscript {
         maven_url = "http://172.22.80.23:8083"
         maven_username = "deployment"
         maven_password = "deployment"
-
-        v1_contract = ":contracts:v1-ehkd-poc-contract"
-        v2_contract = ":contracts:v2-ehkd-poc-contract"
-        v3_contract = ":contracts:v3-ehkd-poc-contract"
-
-        v1_workflow = ":workflows:v1-ehkd-poc-workflow"
-        v2_workflow = ":workflows:v2-ehkd-poc-workflow"
-        v3_workflow = ":workflows:v3-ehkd-poc-workflow"
     }
 
     repositories {
@@ -41,6 +33,7 @@ buildscript {
         maven { url 'https://software.r3.com/artifactory/corda-dependencies' }
     }
     dependencies {
+        //classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "net.corda.plugins:cordapp:$corda_gradle_plugins_version"
         classpath "net.corda.plugins:cordformation:$corda_gradle_plugins_version"
         classpath "net.corda.plugins:quasar-utils:$corda_gradle_plugins_version"
@@ -52,12 +45,6 @@ buildscript {
 allprojects { //Properties that you need to compile your project (The application)
     apply from: "${rootProject.projectDir}/repositories.gradle"
     apply plugin: 'java'
-    apply plugin: 'org.springframework.boot'
-    apply plugin: 'maven-publish'
-    apply plugin: 'maven'
-
-    group 'com.ehkd'
-    version '1.1-SNAPSHOT'
 
     compileJava {
         options.compilerArgs << '-parameters'
@@ -76,20 +63,14 @@ allprojects { //Properties that you need to compile your project (The applicatio
         preserveFileTimestamps = false
         reproducibleFileOrder = true
     }
-
-    //打包源码
-    task sourceJar(type: Jar) {
-        from sourceSets.main.allJava
-    }
-
 }
 
-apply plugin: 'java'
-apply plugin: 'idea'
-apply plugin: 'net.corda.plugins.cordapp'
-apply plugin: 'net.corda.plugins.cordformation'
-apply plugin: 'net.corda.plugins.quasar-utils'
+group 'com.ehkd'
+version '1.0-SNAPSHOT'
+apply plugin: "java"
 apply plugin: 'org.springframework.boot'
+apply plugin: 'maven-publish'
+apply plugin: 'maven'
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -97,6 +78,7 @@ targetCompatibility = 1.8
 dependencies {
     implementation "org.projectlombok:lombok:$lombok_version"
 
+    //compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     // Corda dependencies.
     compile "net.corda:corda-core:$corda_core_release_version"
     compile "net.corda:corda-node-api:$corda_release_version"
@@ -111,6 +93,7 @@ dependencies {
     compile("org.springframework.boot:spring-boot-starter-security:$spring_boot_version") {
         exclude group: "org.springframework.boot", module: "spring-boot-starter-logging"
     }
+    compile project(":ehkd-poc-corda")
 
     compileOnly "org.projectlombok:lombok:$lombok_version"
     annotationProcessor "org.projectlombok:lombok:$lombok_version"
@@ -122,15 +105,10 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test:$spring_boot_version")
     testCompile "junit:junit:4.13.1"
 
-    cordaDriver "org.postgresql:postgresql:42.2.5"
-
-    cordapp project(v1_contract)
-    cordapp project(v2_contract)
-    cordapp project(v3_contract)
-
-    cordapp project(v1_workflow)
-    cordapp project(v2_workflow)
-    cordapp project(v3_workflow)
+}
+configurations {
+    all*.exclude module: 'spring-boot-starter-logging'
+    all*.exclude module: 'logback-classic'
 }
 
 repositories {
@@ -141,44 +119,56 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 
-task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
+jar {
+    enabled = true
+    getCustomVersion()
+}
+//生成版本号
+def getCustomVersion() {
+    String[]vs=project.version.toString().split("-")
+    //git上的提交次数
+    Process process = "git rev-list --count HEAD".execute()
+    process.waitFor()
+    project.version = vs[0]+"."+process.getText().toInteger()+"-"+vs[1]
+}
 
-    nodeDefaults {
-        projectCordapp {
-            deploy = false
+//打包源码
+task sourceJar(type: Jar) {
+    from sourceSets.main.allJava
+}
+//上传maven私服
+publishing {
+    publications {
+        maven(MavenPublication) {
+            println '************************************************************'
+            println '* This project version data                                 '
+            println "* groupId : $project.group                                  "
+            println "* artifactId : $project.name                                "
+            println "* version : $project.version                                "
+            println '************************************************************'
+            groupId project.group
+            artifactId project.name
+            version project.version
+            //如果是war包填写components.web，如果是jar包填写components.java
+            from components.java
+            //配置上传源码
+            artifact sourceJar {
+                classifier "sources"
+            }
         }
-        cordapp project(v1_contract)
-        cordapp project(v1_workflow)
-        //runSchemaMigration = true
     }
-    node {
-        name "O=Notary,L=London,C=GB"
-        notary = [validating : false]
-        p2pAddress "corda-notary-service:10002"
-        rpcSettings {
-            address("0.0.0.0:10003")
-            adminAddress("0.0.0.0:10043")
+    repositories {
+        maven {
+            //指定要上传的maven私服仓库
+            if (project.version.endsWith('-SNAPSHOT')) {
+                url = "$maven_url/repository/maven-snapshots/"
+            } else {
+                url = "$maven_url/repository/maven-releases/"
+            }
+            credentials {
+                username "$maven_username"
+                password "$maven_password"
+            }
         }
-        extraConfig = [
-                'dataSourceProperties.dataSource.url' : 'jdbc:postgresql://corda-postgres:5432/notary',
-                'dataSourceProperties.dataSourceClassName' : 'org.postgresql.ds.PGSimpleDataSource',
-                'dataSourceProperties.dataSource.user' : 'postgres',
-                'dataSourceProperties.dataSource.password' : 'postgres'
-        ]
-    }
-    node {
-        name "O=PartyA,L=London,C=GB"
-        p2pAddress "corda-bank-service:10005"
-        rpcSettings {
-            address("0.0.0.0:10006")
-            adminAddress("0.0.0.0:10046")
-        }
-        rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
-        extraConfig = [
-                'dataSourceProperties.dataSource.url' : 'jdbc:postgresql://corda-postgres:5432/bank',
-                'dataSourceProperties.dataSourceClassName' : 'org.postgresql.ds.PGSimpleDataSource',
-                'dataSourceProperties.dataSource.user' : 'postgres',
-                'dataSourceProperties.dataSource.password' : 'postgres'
-        ]
     }
 }
